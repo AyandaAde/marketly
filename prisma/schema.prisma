@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model business {
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String?
+  firstName      String
+  lastName       String
+  email          String  @unique
+  phone          String?
+  companyName    String
+  companySize    String?
+  industry       String
+  companyWebsite String?
+  description    String?
+
+  @@unique([userId])
+  @@map("businesses")
+}
+
+model individual {
+  id                     String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String?
+  firstName              String
+  lastName               String
+  email                  String     @unique
+  phone                  String?
+  interests              String[]
+  budgetRange            String?
+  addressLine1           String
+  addressLine2           String?
+  city                   String
+  state                  String
+  postalCode             String
+  country                String
+  useSameForBilling      Boolean
+  receiveDeals           Boolean?
+  receiveRecommendations Boolean?
+  Cart                   Cart?
+  wishlists              wishlist[]
+
+  @@unique([userId])
+  @@map("individuals")
+}
+
+model product {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  category          String
+  description       String
+  estimatedDelivery Json?
+  fastShipping      Boolean
+  image             String
+  inStock           Boolean
+  location          String
+  name              String
+  originalPrice     Float?
+  price             Float
+  rating            Float
+  reviews           Int
+  shippingCosts     Json?
+  shipsTo           String[]
+  tags              String[]
+  vendor            String
+  website           String
+  cartItem          cartItem[]
+  wishlistItems     wishlistItem[]
+
+  @@map("products")
+}
+
+model cartItem {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  cartId    String @db.ObjectId
+  productId String @db.ObjectId
+  quantity  Int
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cartItems")
+}
+
+model Cart {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?
+  sessionId String?
+
+  user      individual? @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  cartItem  cartItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId])
+  @@unique([sessionId])
+  @@map("carts")
+}
+
+model wishlist {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?
+  sessionId String?
+
+  user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  wishList wishlistItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+  @@unique([sessionId])
+  @@map("wishlists")
+}
+
+model wishlistItem {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  wishlistId String @db.ObjectId
+  productId  String @db.ObjectId
+
+  wishlist wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, productId])
+  @@map("wishlistItems")
+}

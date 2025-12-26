@@ -1,0 +1,7 @@
+version: "3.9"
+services: 
+  app:
+    build: .
+    image: puzzle/marketly:latest
+    container_name: marketly
+    command: ["./run_tests.sh", "${TASK_ID}"]
