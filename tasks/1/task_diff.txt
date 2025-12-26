@@ -1,0 +1,260 @@
+diff --git a/app/api/match-with-consultant/route.ts b/app/api/match-with-consultant/route.ts
+index 2264505..55350ae 100644
+--- a/app/api/match-with-consultant/route.ts
++++ b/app/api/match-with-consultant/route.ts
+@@ -1,105 +1,53 @@
++import { prisma } from "@/lib/db/prisma";
+ import { NextRequest, NextResponse } from "next/server";
+ 
+ export async function POST(req: NextRequest) {
+   try {
+-    const { inquiry } = await req.json();
++    const { inquiry, email } = await req.json();
+ 
+     if (!inquiry) {
+-      throw new Error("Internal server error");
++      return new NextResponse("Error: Missing requirement inquiry", {
++        status: 400,
++        statusText: "Error: Missing requirement inquiry",
++      });
+     }
+ 
+-    const consultants = [
+-      {
+-        id: "1",
+-        image: "/images/james-richardson.jpg",
+-        name: "Mr.Jamees R",
+-        email: "james@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "Technology & Software Development",
+-            value: "technology-and-software-development",
+-          },
+-          {
+-            title: "SEO",
+-            value: "seo",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "JR",
+-        location: "British Columbia, Canada",
+-      },
+-      {
+-        id: "2",
+-        image: "/images/lola-dam.jpg",
+-        name: "Ms.Lola D",
+-        email: "lola@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "SEO",
+-            value: "seo",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "LD",
+-        location: "New York, United States",
+-      },
+-      {
+-        id: "3",
+-        image: "/images/joseph-gonzalez.jpg",
+-        name: "Mr.Joseph G",
+-        email: "joseph@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "Marketing & Brand Development",
+-            value: "marketing-and-brand-development",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "JG",
+-        location: "British Columbia, Canada",
+-      },
+-    ];
++    if (!email) throw new Error("Internal server error.");
+ 
+-    const consultant = consultants.find((consultant) =>
++    const consultants = await prisma.consultant.findMany();
++    let category: string;
++    let consultant = consultants.find((consultant) =>
+       consultant.expertise.some((expertise) =>
+         inquiry.toLowerCase().includes(expertise.value)
+       )
+     );
+ 
++    if (consultant) {
++      category =
++        consultant.expertise.find((expertise) =>
++          inquiry.toLowerCase().includes(expertise.value)
++        )?.title ?? "";
++    }
++
+     if (!consultant) {
+-      return new NextResponse(JSON.stringify(consultants[0]), { status: 200 });
++      category = "general-consultation";
++      consultant = consultants.find((consultant) =>
++        consultant.expertise.some((expertise) => expertise.value === category)
++      );
+     }
+ 
+-    return new NextResponse(JSON.stringify(consultant), { status: 200 });
++    return new NextResponse(
++      JSON.stringify({ consultant, category: category! }),
++      {
++        status: 200,
++        statusText: "Successfully matched with consultant",
++      }
++    );
+   } catch (error) {
+     console.error("Error matching with consultant", error);
+-    return new NextResponse("Internal server error", { status: 500 });
++    return new NextResponse("Internal server error", {
++      status: 500,
++      statusText: "Internal server error",
++    });
+   }
+ }
+diff --git a/app/page.tsx b/app/page.tsx
+index 3065cad..c915646 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -575,7 +575,7 @@ export default function Home() {
+             </div>
+             <div className="mx-auto max-w-5xl">
+               <FocusCards cards={team} />
+-              <MatchWithConsultantModal inquiry="Hi, I need help with SEO." />
++              <MatchWithConsultantModal inquiry="Hi, I have a have a website I'd like enhanced." />
+             </div>
+           </div>
+         </section>
+diff --git a/components/matchWithConsultantModal.tsx b/components/matchWithConsultantModal.tsx
+index 4bd74b2..7de9c34 100644
+--- a/components/matchWithConsultantModal.tsx
++++ b/components/matchWithConsultantModal.tsx
+@@ -25,6 +25,7 @@ import {
+   FormMessage,
+ } from "./ui/form";
+ import { Input } from "./ui/input";
++import { toast } from "sonner";
+ 
+ interface MatchWithConsultantModalProps {
+   inquiry: string;
+@@ -68,6 +69,9 @@ const inquirySchema = z.object({
+   inquiry: z
+     .string({ message: "Please enter an inquiry." })
+     .min(1, { message: "Please enter an inquiry." }),
++  email: z
++    .string({ message: "Please enter a valid email." })
++    .email({ message: "Please enter a valid email." }),
+ });
+ 
+ type InquiryData = z.infer<typeof inquirySchema>;
+@@ -86,6 +90,7 @@ export function MatchWithConsultantContent({
+     resolver: zodResolver(inquirySchema),
+     defaultValues: {
+       inquiry: "",
++      email: "",
+     },
+   });
+ 
+@@ -100,8 +105,15 @@ export function MatchWithConsultantContent({
+   });
+ 
+   const onSubmit = (data: InquiryData) => {
+-    console.log("Submitting.");
+-    sumbitInquiry.mutate(data, {});
++    sumbitInquiry.mutate(data, {
++      onSuccess: () => {
++        console.log("Successfully matched with consultant.");
++        inquiryForm.reset();
++      },
++      onError: () => {
++        console.error("Failed to match with consultant.");
++      },
++    });
+   };
+ 
+   return (
+@@ -173,6 +185,23 @@ export function MatchWithConsultantContent({
+                     <FormMessage className="text-red-700/90" />
+                   </FormItem>
+                 )}
++              />{" "}
++              <FormField
++                control={inquiryForm.control}
++                name="email"
++                render={({ field }) => (
++                  <FormItem className="space-y-2">
++                    <FormLabel htmlFor="inquiry">Email</FormLabel>
++                    <FormControl>
++                      <Input
++                        type="email"
++                        placeholder="jason.c@email.com"
++                        {...field}
++                      />
++                    </FormControl>
++                    <FormMessage className="text-red-700/90" />
++                  </FormItem>
++                )}
+               />
+               <Button
+                 type="submit"
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 0de966b..b971b57 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -8,6 +8,11 @@ datasource db {
+   url      = env("DATABASE_URL")
+ }
+ 
++type expertise {
++  title String
++  value String
++}
++
+ model business {
+   id             String  @id @default(auto()) @map("_id") @db.ObjectId
+   userId         String?
+@@ -130,3 +135,16 @@ model wishlistItem {
+   @@unique([wishlistId, productId])
+   @@map("wishlistItems")
+ }
++
++model consultant {
++  id        String      @id @default(auto()) @map("_id") @db.ObjectId
++  image     String
++  name     String
++  email     String
++  title     String
++  expertise expertise[]
++  initials  String
++  location  String
++
++  @@map("consultants")
++}
