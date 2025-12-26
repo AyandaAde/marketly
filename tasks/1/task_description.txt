@@ -1,0 +1,39 @@
+task_description: |
+  Task: Match with best consultant enhancement.
+
+  We have a match with best consultant feature that currently matches a user to the best consultant for their inquiry. Make it so if a user's inquiry doesn't match any of the 
+  consultant's areas of expertise it should categorise it as a general inquiry and match them with the first consultant that matches and return success or error messages upon
+  success or failure to match with a consultant.
+
+  Instructions:
+
+    Goal:
+    - Categorise the user's inquiry as a general inquiry if it doesn't match any consultant's areas of expertise.
+    - Match them with the first consultant that matches.
+
+    Constraints:
+    - An inquiry must be sent to the match-with-best-consultant endpoint.
+    - If no inquiry is sent the route must return a 400 error.
+    - The error message must say "Error: Missing requirement inquiry".
+    - If an inquiry is sent it should match the user with the best consultant.
+    - If the user's inquiry doesn't match with any consultant's areas of expertise it should be categorised as a general inquiry.
+    - The user should be match with the first consultant that fits.
+    - The route should return a 200 status upon successfull matching with the consultant.
+    - The success message should be "Successfully matched with consultant"
+    - The route should return a 500 error upon failure to match a user with a consultant.
+    - The error message should be "Internal server error."
+
+    What will be Tested:
+    - The route should return a 400 error if no inquiry is passed to the route.
+    - The error message should say "Error: Missing requirement inquiry".
+    - If the user's inquiry doesn't match any consultant's areas of expertise it should be categorised as a general inquiry.
+    - The route should return a 200 status upon successfull matching with a consultant.
+    - The status message should be "Successfully matched with consultant".
+    - If the route fails to match the user with a consultant it should return a 500 status.
+    - The status message should be "Internal server error".
+
+
+difficulty: easy
+category: <Feature>
+tags: ["nextjs", "react", "contact", "API", "form validation", "error-handling", "backend"]
+parser_name: <jest>
