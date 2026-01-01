@@ -1,0 +1,28 @@
+task_description: |
+  Task: Enable the user to add a firstName and lastName to the inquiry form.
+
+  We currently have an inquiry form that allows a user to send an inquiry. Enable the user to add a firstName and lastName to the form.
+  Instructions:
+
+    Goal:
+    - When a user is filling up the inquiry form enable them to add a firstName and lastName. 
+
+    Constraints:
+    - The form should have form validation.
+    - The form should throw an error if no firstName or lastName are present in the form.
+    - The firstName and LastName should be passed to the backend.
+    - The backend should throw an error if no firstName or lastName are present.
+
+    What will be Tested:
+    - The system should throw an error if no firstName or lastName are present in the form.
+    - If no firstName is passed to the backend it should throw 400 error.
+    - The error message should be 'Error: Missing requirement first name.'
+    - If no lastName is passed to the backend it should throw 400 error.
+    - The error message should be 'Error: Missing requirement last name.'
+    - If the route succeeds in sending an email to the consultant it should return a 200 status.
+    - If the route fails to send an email to the consultant it should return a 500 status.
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "contact", "email", "form validation", "backend", "RESTful API"]
+parser_name: <jest>

@@ -1,0 +1,273 @@
+diff --git a/app/api/cart/add-to-cart/route.ts b/app/api/cart/add-to-cart/route.ts
+index c4857f2..e3c3741 100644
+--- a/app/api/cart/add-to-cart/route.ts
++++ b/app/api/cart/add-to-cart/route.ts
+@@ -1,11 +1,20 @@
+ import { prisma } from "@/lib/db/prisma";
++import { cookies } from "next/headers";
+ import { NextRequest, NextResponse } from "next/server";
+ 
+ export async function POST(req: NextRequest) {
+   const body = await req.json();
+   const { productId, quantity, userId } = body;
+-  if (!userId)
+-    return new NextResponse("Missing required userId", { status: 400 });
++  let cartSessionId;
++  if (!userId) {
++    cartSessionId = (await cookies()).get("cartSessionId")?.value;
++    if (!cartSessionId)
++      return new NextResponse("No sessionId found", {
++        status: 404,
++        statusText: "No sessionId found",
++      });
++  }
++
+   if (!productId)
+     return new NextResponse("Missing required productId", { status: 400 });
+   if (!quantity)
+@@ -51,9 +60,27 @@ export async function POST(req: NextRequest) {
+       },
+     });
+ 
+-    return new NextResponse("Successfully added item to cart.", {
+-      status: 200,
++    const response = new NextResponse(
++      JSON.stringify({
++        message: "Successfully added item to cart",
++        cartSessionId,
++      }),
++      {
++        status: 200,
++      }
++    );
++
++    //@ts-ignore
++    response.cookies.set({
++      name: "cartSessionId",
++      value: cartSessionId,
++      httpOnly: true,
++      secure: process.env.NODE_ENV === "production",
++      path: "/",
++      sameSite: "lax",
+     });
++
++    return response;
+   } catch (error: any) {
+     console.error("Error adding item to cart", error.message);
+     return new NextResponse(error.message, { status: 500 });
+diff --git a/app/api/cart/create-cart/route.ts b/app/api/cart/create-cart/route.ts
+index fb1822c..7eb6bf4 100644
+--- a/app/api/cart/create-cart/route.ts
++++ b/app/api/cart/create-cart/route.ts
+@@ -4,22 +4,42 @@ import { cookies } from "next/headers";
+ import { NextRequest, NextResponse } from "next/server";
+ 
+ export async function POST(req: NextRequest) {
++  const ip = req.headers.get("x-forwarded-for");
+   const body = await req.json();
+   const { productId, quantity, userId } = body;
++  let cartSessionId;
++  let expiryDate;
++  let cart;
+ 
+-  if (!userId)
+-    return new NextResponse("Missing required userId", { status: 400 });
+   if (!productId)
+     return new NextResponse("Missing required productId", { status: 400 });
+   if (!quantity)
+     return new NextResponse("Missing required quantity", { status: 400 });
+ 
+   try {
+-    const cart = await prisma.cart.create({
+-      data: {
+-        userId,
+-      },
+-    });
++    if (!userId) {
++      cartSessionId = (await cookies()).get("cartSessionId")?.value;
++      if (!cartSessionId) {
++        cartSessionId = `user-${ip}`;
++        if (!ip)
++          return new NextResponse("Error: Failed to create sessionId", {
++            status: 400,
++            statusText: "Error: Failed to create sessionId",
++          });
++        expiryDate = addDays(new Date(), 30);
++      }
++
++      cart = await prisma.cart.create({
++        data: {
++          sessionId: cartSessionId,
++        },
++      });
++    } else
++      cart = await prisma.cart.create({
++        data: {
++          userId,
++        },
++      });
+ 
+     await prisma.cartItem.create({
+       data: {
+@@ -29,9 +49,28 @@ export async function POST(req: NextRequest) {
+       },
+     });
+ 
+-    return new NextResponse("Successfully added item to cart.", {
+-      status: 200,
++    const response = new NextResponse(
++      JSON.stringify({
++        message: "Successfully cerated cart",
++        cartSessionId,
++      }),
++      {
++        status: 200,
++      }
++    );
++
++    //@ts-ignore
++    response.cookies.set({
++      name: "cartSessionId",
++      value: cartSessionId,
++      httpOnly: true,
++      secure: process.env.NODE_ENV === "production",
++      path: "/",
++      sameSite: "lax",
++      expires: expiryDate,
+     });
++
++    return response;
+   } catch (error: any) {
+     console.error("Error adding item to cart", error.message);
+     return new NextResponse(error.message, { status: 500 });
+diff --git a/app/api/cart/get-cart/route.ts b/app/api/cart/get-cart/route.ts
+index 2873a26..69602c6 100644
+--- a/app/api/cart/get-cart/route.ts
++++ b/app/api/cart/get-cart/route.ts
+@@ -2,48 +2,86 @@ import { prisma } from "@/lib/db/prisma";
+ import { redisClient } from "@/lib/redis";
+ import { auth } from "@clerk/nextjs/server";
+ import { addDays } from "date-fns";
++import { cookies } from "next/headers";
+ import { NextRequest, NextResponse } from "next/server";
+ 
+-
+ export async function GET(req: NextRequest) {
+-    const { userId } = await auth();
+-    const ip = req.headers.get("x-forwarded-for");
+-    const cacheKey = !userId ? `cart-${ip}` : `cart-${userId}`;
+-
+-    try {
+-        const cachedData = await redisClient.get(cacheKey);
+-
+-        if (cachedData) return new NextResponse(cachedData, { status: 200 });
+-
+-        if (userId) {
+-            const cart = await prisma.cart.findUnique({
+-                where: {
+-                    userId
+-                },
+-                include: {
+-                    cartItem: {
+-                        select: {
+-                            id: true,
+-                            quantity: true,
+-                            product: true
+-                        },
+-                    }
+-                }
+-            });
+-
+-            if (cart) {
+-
+-                const expiryDate = addDays(new Date(), 1);
+-
+-                await redisClient.set(cacheKey, JSON.stringify(cart?.cartItem), "EX", Math.floor(expiryDate.getTime() / 1000));
+-
+-                return new NextResponse(JSON.stringify(cart?.cartItem), { status: 200 });
+-            }
+-        }
+-
+-        return new NextResponse(JSON.stringify([]), { status: 200 })
+-    } catch (error: any) {
+-        console.error("Error getting cart:", error.message);
+-        return new NextResponse(error.message, { status: 500 })
++  const { userId } = await auth();
++  const ip = req.headers.get("x-forwarded-for");
++  const cacheKey = !userId ? `cart-${ip}` : `cart-${userId}`;
++  let cartSessionId;
++
++  try {
++    const cachedData = await redisClient.get(cacheKey);
++    if (cachedData) return new NextResponse(cachedData, { status: 200 });
++
++    let cart;
++
++    if (!userId) {
++      cartSessionId = (await cookies()).get("cartSessionId")?.value;
++
++      if (!cartSessionId) {
++        return new NextResponse("No sessionId found", {
++          status: 404,
++          statusText: "No sessionId found",
++        });
++      }
++
++      cart = await prisma.cart.findUnique({
++        where: { sessionId: cartSessionId },
++        include: {
++          cartItem: {
++            select: {
++              id: true,
++              quantity: true,
++              product: true,
++            },
++          },
++        },
++      });
++    } else {
++      cart = await prisma.cart.findUnique({
++        where: { userId },
++        include: {
++          cartItem: {
++            select: {
++              id: true,
++              quantity: true,
++              product: true,
++            },
++          },
++        },
++      });
+     }
++
++    const expiryDate = addDays(new Date(), 1);
++
++    await redisClient.set(
++      cacheKey,
++      JSON.stringify(cart?.cartItem ?? []),
++      "EX",
++      Math.floor(expiryDate.getTime() / 1000)
++    );
++
++    const response = new NextResponse(JSON.stringify(cart?.cartItem ?? []), {
++      status: 200,
++    });
++
++    if (cartSessionId) {
++      response.cookies.set({
++        name: "cartSessionId",
++        value: cartSessionId,
++        httpOnly: true,
++        secure: process.env.NODE_ENV === "production",
++        path: "/",
++        sameSite: "lax",
++        expires: expiryDate,
++      });
++    }
++
++    return response;
++  } catch (error: any) {
++    console.error("Error getting cart:", error.message);
++    return new NextResponse(error.message, { status: 500 });
++  }
+ }

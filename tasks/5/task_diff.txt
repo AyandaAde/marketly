@@ -1,0 +1,722 @@
+diff --git a/app/api/match-with-consultant/route.ts b/app/api/match-with-consultant/route.ts
+index 2264505..5fe9b0c 100644
+--- a/app/api/match-with-consultant/route.ts
++++ b/app/api/match-with-consultant/route.ts
+@@ -1,105 +1,142 @@
+-import { NextRequest, NextResponse } from "next/server";
+-
+-export async function POST(req: NextRequest) {
+-  try {
+-    const { inquiry } = await req.json();
+-
+-    if (!inquiry) {
+-      throw new Error("Internal server error");
+-    }
+-
+-    const consultants = [
+-      {
+-        id: "1",
+-        image: "/images/james-richardson.jpg",
+-        name: "Mr.Jamees R",
+-        email: "james@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "Technology & Software Development",
+-            value: "technology-and-software-development",
+-          },
+-          {
+-            title: "SEO",
+-            value: "seo",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "JR",
+-        location: "British Columbia, Canada",
+-      },
+-      {
+-        id: "2",
+-        image: "/images/lola-dam.jpg",
+-        name: "Ms.Lola D",
+-        email: "lola@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "SEO",
+-            value: "seo",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "LD",
+-        location: "New York, United States",
+-      },
+-      {
+-        id: "3",
+-        image: "/images/joseph-gonzalez.jpg",
+-        name: "Mr.Joseph G",
+-        email: "joseph@email.com",
+-        title: "Consultant",
+-        expertise: [
+-          {
+-            title: "Marketing & Brand Development",
+-            value: "marketing-and-brand-development",
+-          },
+-          { title: "General Consultation", value: "general-consultation" },
+-          {
+-            title: "Partnership Opportunity",
+-            value: "partnership-opportunity",
+-          },
+-          {
+-            title: "Other",
+-            value: "other",
+-          },
+-        ],
+-        initials: "JG",
+-        location: "British Columbia, Canada",
+-      },
+-    ];
+-
+-    const consultant = consultants.find((consultant) =>
+-      consultant.expertise.some((expertise) =>
+-        inquiry.toLowerCase().includes(expertise.value)
+-      )
+-    );
+-
+-    if (!consultant) {
+-      return new NextResponse(JSON.stringify(consultants[0]), { status: 200 });
+-    }
+-
+-    return new NextResponse(JSON.stringify(consultant), { status: 200 });
+-  } catch (error) {
+-    console.error("Error matching with consultant", error);
+-    return new NextResponse("Internal server error", { status: 500 });
+-  }
+-}
++import { env } from "@/env";
++import { prisma } from "@/lib/db/prisma";
++import { NextRequest, NextResponse } from "next/server";
++import nodemailer from "nodemailer";
++import OpenAI from "openai";
++
++export const openai = new OpenAI({
++  apiKey: env.OPENAI_API_KEY,
++});
++
++export async function POST(req: NextRequest) {
++  const transporter = nodemailer.createTransport({
++    service: "gmail",
++    auth: {
++      user: env.EMAIL_USER,
++      pass: env.EMAIL_PASSWORD,
++    },
++    tls: {
++      rejectUnauthorized: false,
++    },
++  });
++
++  try {
++    const { inquiry, firstName, lastName, email } = await req.json();
++    if (!email || !inquiry || !firstName || !lastName)
++      return new NextResponse(
++        `Error: Missing requirement ${
++          !email
++            ? "email"
++            : !inquiry
++            ? "inquiry"
++            : !firstName
++            ? "first name"
++            : "last name"
++        }`,
++        {
++          status: 400,
++          statusText: `Error: Missing requirement ${
++            !email
++              ? "email"
++              : !inquiry
++              ? "inquiry"
++              : !firstName
++              ? "first name"
++              : "last name"
++          }`,
++        }
++      );
++
++    const consultants = await prisma.consultant.findMany();
++
++    const categories = consultants.map((consultant) =>
++      consultant.expertise.map((expertise) => expertise.title)
++    );
++    const flatCategories = categories.flat();
++
++    const uniqueCategories = [...new Set(flatCategories)];
++
++    const response = await openai.responses.create({
++      model: "gpt-5-nano",
++      reasoning: { effort: "high" },
++      instructions: `
++          You are a semantic categorization assistant.
++
++        Your task: Match the user's inquiry to the most appropriate category from the provided list.
++        Focus on meaning, intent, and context, not just keyword matches.
++        If the inquiry does not match any category, categorize it as "general inquiry".
++
++        Output format (JSON only, no extra text):
++        {
++          "category": "<matched category or 'general-consultation'>",
++        }
++     `,
++      input: `
++       Categories: ${JSON.stringify(uniqueCategories)}
++              Inquiry:
++              "${inquiry}"
++              `,
++    });
++    const result = JSON.parse(response.output_text);
++
++    let category = result.category;
++    let consultant;
++    console.log("Category:", category);
++
++    if (category) {
++      consultant = consultants.find((consultant) =>
++        consultant.expertise.some((expertise) => expertise.value === category)
++      );
++    } else {
++      consultant = consultants.find((consultant) =>
++        consultant.expertise.some((expertise) =>
++          inquiry.toLowerCase().includes(expertise.value)
++        )
++      );
++      if (consultant) {
++        category =
++          consultant.expertise.find((expertise) =>
++            inquiry.toLowerCase().includes(expertise.value)
++          )?.title ?? "";
++      }
++
++      if (!consultant) {
++        category = "general-consultation";
++        consultant = consultants.find((consultant) =>
++          consultant.expertise.some((expertise) => expertise.value === category)
++        );
++      }
++    }
++
++    const mailOptions = {
++      from: `${firstName} ${lastName} <${email}>`,
++      to: "akinyambo@kondarsoft.com",
++      cc: consultant?.email ?? "",
++      subject: `Contact Form Submission from ${firstName} ${lastName}`,
++      replyto: `${email}`,
++      html: `<div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
++<h2>New Contact Submission from ${firstName} ${lastName}</h2>
++<p><strong>First Name:</strong> ${firstName}</p>
++<p><strong>Last Name:</strong> ${lastName}</p>
++    <p><strong>Email:</strong> ${email}</p>
++    <br/>
++    <p><strong>Inquiry:</strong>${inquiry}</p>
++</div>`,
++    };
++    await transporter.sendMail(mailOptions);
++
++    return new NextResponse(
++      JSON.stringify({ consultant, category: category! }),
++      {
++        status: 200,
++        statusText: "Successfully matched with consultant",
++      }
++    );
++  } catch (error) {
++    console.error("Error matching with consultant", error);
++    return new NextResponse("Internal server error", {
++      status: 500,
++      statusText: "Internal server error",
++    });
++  }
++}
+\ No newline at end of file
+diff --git a/app/api/user/get-user/[userId]/route.ts b/app/api/user/get-user/[userId]/route.ts
+new file mode 100644
+index 0000000..a212c23
+--- /dev/null
++++ b/app/api/user/get-user/[userId]/route.ts
+@@ -0,0 +1,22 @@
++import { prisma } from "@/lib/db/prisma";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function GET(
++  req: NextRequest,
++  { params }: { params: { userId: string } }
++) {
++  const { userId } = params;
++
++  try {
++    const user = await prisma.individual.findUnique({
++      where: {
++        userId,
++      },
++    });
++
++    return new NextResponse(JSON.stringify(user), { status: 200 });
++  } catch (error) {
++    console.error("Error getting user", error);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/components/matchWithConsultantModal.tsx b/components/matchWithConsultantModal.tsx
+index 4bd74b2..24da222 100644
+--- a/components/matchWithConsultantModal.tsx
++++ b/components/matchWithConsultantModal.tsx
+@@ -9,7 +9,7 @@ import {
+ } from "@/components/ui/animated-modal";
+ 
+ import { zodResolver } from "@hookform/resolvers/zod";
+-import { useMutation } from "@tanstack/react-query";
++import { useMutation, useQuery } from "@tanstack/react-query";
+ import axios from "axios";
+ import { ArrowRight, Loader } from "lucide-react";
+ import { motion } from "motion/react";
+@@ -25,6 +25,8 @@ import {
+   FormMessage,
+ } from "./ui/form";
+ import { Input } from "./ui/input";
++import { useAuth } from "@clerk/nextjs";
++import { useEffect } from "react";
+ 
+ interface MatchWithConsultantModalProps {
+   inquiry: string;
+@@ -68,6 +70,11 @@ const inquirySchema = z.object({
+   inquiry: z
+     .string({ message: "Please enter an inquiry." })
+     .min(1, { message: "Please enter an inquiry." }),
++  firstName: z.string().min(1, { message: "Please enter a first name." }),
++  lastName: z.string().min(1, { message: "Please enter a last name." }),
++  email: z
++    .string({ message: "Please enter a valid email." })
++    .email({ message: "Please enter a valid email." }),
+ });
+ 
+ type InquiryData = z.infer<typeof inquirySchema>;
+@@ -75,6 +82,8 @@ type InquiryData = z.infer<typeof inquirySchema>;
+ export function MatchWithConsultantContent({
+   inquiry,
+ }: MatchWithConsultantModalProps) {
++  const { userId } = useAuth();
++
+   const { setOpen } = useModal();
+   const images = [
+     "/images/james-richardson.jpg",
+@@ -82,10 +91,26 @@ export function MatchWithConsultantContent({
+     "/images/lola-dam.jpg",
+   ];
+ 
++  const getUser = useQuery({
++    queryKey: ["getUser", userId],
++    queryFn: async () => {
++      const { data } = await axios.get(`/api/user/get-user`, {
++        params: {
++          userId,
++        },
++      });
++      return data;
++    },
++    enabled: !!userId,
++  });
++
+   const inquiryForm = useForm<InquiryData>({
+     resolver: zodResolver(inquirySchema),
+     defaultValues: {
+       inquiry: "",
++      firstName: "",
++      lastName: "",
++      email: "",
+     },
+   });
+ 
+@@ -100,10 +125,28 @@ export function MatchWithConsultantContent({
+   });
+ 
+   const onSubmit = (data: InquiryData) => {
+-    console.log("Submitting.");
+-    sumbitInquiry.mutate(data, {});
++    sumbitInquiry.mutate(data, {
++      onSuccess: () => {
++        console.log("Successfully matched with consultant.");
++        inquiryForm.reset();
++      },
++      onError: () => {
++        console.error("Failed to match with consultant.");
++      },
++    });
+   };
+ 
++  useEffect(() => {
++    if (getUser.data) {
++      const { firstName, lastName, email } = getUser.data;
++      inquiryForm.reset({
++        firstName,
++        lastName,
++        email,
++      });
++    }
++  }, [getUser.data]);
++
+   return (
+     <div
+       className="inset-0 z-50  flex items-center justify-center"
+@@ -157,6 +200,51 @@ export function MatchWithConsultantContent({
+               onSubmit={inquiryForm.handleSubmit(onSubmit)}
+               className="space-y-4 mt-5 w-10/12 mx-auto"
+             >
++              <div className="flex flex-col md:flex-row gap-4">
++                <FormField
++                  control={inquiryForm.control}
++                  name="firstName"
++                  render={({ field }) => (
++                    <FormItem className="space-y-2">
++                      <FormLabel htmlFor="firstName">First Name</FormLabel>
++                      <FormControl>
++                        <Input type="text" placeholder="Jason" {...field} />
++                      </FormControl>
++                      <FormMessage className="text-red-700/90" />
++                    </FormItem>
++                  )}
++                />
++                <FormField
++                  control={inquiryForm.control}
++                  name="lastName"
++                  render={({ field }) => (
++                    <FormItem className="space-y-2">
++                      <FormLabel htmlFor="lastName">Lasr Name</FormLabel>
++                      <FormControl>
++                        <Input type="text" placeholder="Clark" {...field} />
++                      </FormControl>
++                      <FormMessage className="text-red-700/90" />
++                    </FormItem>
++                  )}
++                />
++              </div>
++              <FormField
++                control={inquiryForm.control}
++                name="email"
++                render={({ field }) => (
++                  <FormItem className="space-y-2">
++                    <FormLabel htmlFor="inquiry">Email</FormLabel>
++                    <FormControl>
++                      <Input
++                        type="email"
++                        placeholder="jason.c@email.com"
++                        {...field}
++                      />
++                    </FormControl>
++                    <FormMessage className="text-red-700/90" />
++                  </FormItem>
++                )}
++              />
+               <FormField
+                 control={inquiryForm.control}
+                 name="inquiry"
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 0de966b..8a3cce6 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -1,132 +1,150 @@
+-generator client {
+-  provider = "prisma-client-js"
+-  // output   = "../lib/generated/prisma"
+-}
+-
+-datasource db {
+-  provider = "mongodb"
+-  url      = env("DATABASE_URL")
+-}
+-
+-model business {
+-  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+-  userId         String?
+-  firstName      String
+-  lastName       String
+-  email          String  @unique
+-  phone          String?
+-  companyName    String
+-  companySize    String?
+-  industry       String
+-  companyWebsite String?
+-  description    String?
+-
+-  @@unique([userId])
+-  @@map("businesses")
+-}
+-
+-model individual {
+-  id                     String     @id @default(auto()) @map("_id") @db.ObjectId
+-  userId                 String?
+-  firstName              String
+-  lastName               String
+-  email                  String     @unique
+-  phone                  String?
+-  interests              String[]
+-  budgetRange            String?
+-  addressLine1           String
+-  addressLine2           String?
+-  city                   String
+-  state                  String
+-  postalCode             String
+-  country                String
+-  useSameForBilling      Boolean
+-  receiveDeals           Boolean?
+-  receiveRecommendations Boolean?
+-  Cart                   Cart?
+-  wishlists              wishlist[]
+-
+-  @@unique([userId])
+-  @@map("individuals")
+-}
+-
+-model product {
+-  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+-  category          String
+-  description       String
+-  estimatedDelivery Json?
+-  fastShipping      Boolean
+-  image             String
+-  inStock           Boolean
+-  location          String
+-  name              String
+-  originalPrice     Float?
+-  price             Float
+-  rating            Float
+-  reviews           Int
+-  shippingCosts     Json?
+-  shipsTo           String[]
+-  tags              String[]
+-  vendor            String
+-  website           String
+-  cartItem          cartItem[]
+-  wishlistItems     wishlistItem[]
+-
+-  @@map("products")
+-}
+-
+-model cartItem {
+-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+-  cartId    String @db.ObjectId
+-  productId String @db.ObjectId
+-  quantity  Int
+-
+-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+-  product product @relation(fields: [productId], references: [id], onDelete: Cascade)
+-
+-  @@unique([cartId, productId])
+-  @@map("cartItems")
+-}
+-
+-model Cart {
+-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+-  userId    String?
+-  sessionId String?
+-
+-  user      individual? @relation(fields: [userId], references: [userId], onDelete: Cascade)
+-  cartItem  cartItem[]
+-  createdAt DateTime    @default(now())
+-  updatedAt DateTime    @updatedAt
+-
+-  @@unique([userId])
+-  @@unique([sessionId])
+-  @@map("carts")
+-}
+-
+-model wishlist {
+-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+-  userId    String?
+-  sessionId String?
+-
+-  user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+-  wishList wishlistItem[]
+-
+-  createdAt DateTime @default(now())
+-  updatedAt DateTime @updatedAt
+-
+-  @@unique([userId])
+-  @@unique([sessionId])
+-  @@map("wishlists")
+-}
+-
+-model wishlistItem {
+-  id         String @id @default(auto()) @map("_id") @db.ObjectId
+-  wishlistId String @db.ObjectId
+-  productId  String @db.ObjectId
+-
+-  wishlist wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+-  product  product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+-
+-  @@unique([wishlistId, productId])
+-  @@map("wishlistItems")
+-}
++generator client {
++  provider = "prisma-client-js"
++  // output   = "../lib/generated/prisma"
++}
++
++datasource db {
++  provider = "mongodb"
++  url      = env("DATABASE_URL")
++}
++
++type expertise {
++  title String
++  value String
++}
++
++model business {
++  id             String  @id @default(auto()) @map("_id") @db.ObjectId
++  userId         String?
++  firstName      String
++  lastName       String
++  email          String  @unique
++  phone          String?
++  companyName    String
++  companySize    String?
++  industry       String
++  companyWebsite String?
++  description    String?
++
++  @@unique([userId])
++  @@map("businesses")
++}
++
++model individual {
++  id                     String     @id @default(auto()) @map("_id") @db.ObjectId
++  userId                 String?
++  firstName              String
++  lastName               String
++  email                  String     @unique
++  phone                  String?
++  interests              String[]
++  budgetRange            String?
++  addressLine1           String
++  addressLine2           String?
++  city                   String
++  state                  String
++  postalCode             String
++  country                String
++  useSameForBilling      Boolean
++  receiveDeals           Boolean?
++  receiveRecommendations Boolean?
++  Cart                   Cart?
++  wishlists              wishlist[]
++
++  @@unique([userId])
++  @@map("individuals")
++}
++
++model product {
++  id                String         @id @default(auto()) @map("_id") @db.ObjectId
++  category          String
++  description       String
++  estimatedDelivery Json?
++  fastShipping      Boolean
++  image             String
++  inStock           Boolean
++  location          String
++  name              String
++  originalPrice     Float?
++  price             Float
++  rating            Float
++  reviews           Int
++  shippingCosts     Json?
++  shipsTo           String[]
++  tags              String[]
++  vendor            String
++  website           String
++  cartItem          cartItem[]
++  wishlistItems     wishlistItem[]
++
++  @@map("products")
++}
++
++model cartItem {
++  id        String @id @default(auto()) @map("_id") @db.ObjectId
++  cartId    String @db.ObjectId
++  productId String @db.ObjectId
++  quantity  Int
++
++  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
++  product product @relation(fields: [productId], references: [id], onDelete: Cascade)
++
++  @@unique([cartId, productId])
++  @@map("cartItems")
++}
++
++model Cart {
++  id        String  @id @default(auto()) @map("_id") @db.ObjectId
++  userId    String?
++  sessionId String?
++
++  user      individual? @relation(fields: [userId], references: [userId], onDelete: Cascade)
++  cartItem  cartItem[]
++  createdAt DateTime    @default(now())
++  updatedAt DateTime    @updatedAt
++
++  @@unique([userId])
++  @@unique([sessionId])
++  @@map("carts")
++}
++
++model wishlist {
++  id        String  @id @default(auto()) @map("_id") @db.ObjectId
++  userId    String?
++  sessionId String?
++
++  user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
++  wishList wishlistItem[]
++
++  createdAt DateTime @default(now())
++  updatedAt DateTime @updatedAt
++
++  @@unique([userId])
++  @@unique([sessionId])
++  @@map("wishlists")
++}
++
++model wishlistItem {
++  id         String @id @default(auto()) @map("_id") @db.ObjectId
++  wishlistId String @db.ObjectId
++  productId  String @db.ObjectId
++
++  wishlist wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
++  product  product  @relation(fields: [productId], references: [id], onDelete: Cascade)
++
++  @@unique([wishlistId, productId])
++  @@map("wishlistItems")
++}
++
++model consultant {
++  id        String      @id @default(auto()) @map("_id") @db.ObjectId
++  image     String
++  name      String
++  email     String
++  title     String
++  expertise expertise[]
++  initials  String
++  location  String
++
++  @@map("consultants")
++}  
+\ No newline at end of file

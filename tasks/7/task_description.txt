@@ -1,0 +1,41 @@
+task_description: |
+  Task: Check whether a product is part of the user's wishlist using the products productId and check
+  whether a wishlist exitsts befre adding an item to the wishlist.
+
+  The system currently checks whether a product is part of a favorites list, make it so it checks whether
+  a product is part of a user's wishlist from the database using the productId and check whether the wishlist 
+  exists before adding an item to the wishlist. 
+
+  Instructions:
+
+    Goal:
+    - Check whethere a product is part of a user's wishlist useing the productId..
+    - Return true or false to the frontend to indicate whether or not it is in the user's wishlist.
+    - Display on the frontend whether the product is in the user's wishlist or not.
+    - If the item is not in the wishlist check if the wishlist exists before adding the item to the wishlist.
+    - If the wishlist exists add the item to the wishlist. 
+    - Else create the wishlist first then add the item to the wishlist. 
+
+    Constraints:
+    - Get the wishlist items from the backend.
+    - Check if the product is part of the wishlist using the productId.
+    - If the item is not in the wihslist check if the wishlist exists before adding the item to the wishlist.
+    - If the wishlist exists add the item to the wishlist. 
+    - Else create the wishlist first then add the item to the wishlist.
+    - Return a 500 error message if the route fails.
+    - Return a 200 status if the route succeeeds.
+
+    What will be Tested:
+    - The get-whislit route should return the wishlistItems.
+    - The add-to-wishlist route should check whether a wishlist exists. 
+    - If the wishlist exists it should add the item to the wishlist.
+    - If the wishlist doesn't exists it should create the wishlist and add the item to the wishlist. 
+    - If the route fails to add the item to the wishlist it should return a 500 error. 
+    - The error message should be 'Internal server error'
+    - If the route succeeds it should return a 200 status.
+    - The success message should be 'Successfully added item to wishlist'.
+    
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "wishlist", "API", "prisma", "backend", "authentication", "clerk", "sessions", "cookies"]
+parser_name: <jest>

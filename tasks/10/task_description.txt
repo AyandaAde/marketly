@@ -1,0 +1,34 @@
+task_description: |
+  Task: Delete items from the wishlist.
+
+  We currently have wishlist functionality that doesn't allow user's to remove things from their wishlst, enable the program ot allow user's to delete items from their wishlist.
+
+  Instructions:
+
+    Goal:
+    - The user should be able to delete things to their wishlist using their userId.
+    - The code must update the logic to delete items from the user's wishlist if they are already present in the wishlist.
+    - Make a call to the remove-from-wishlist route when a user removes something from their wishlist.
+    - Update the frontend to show that the item has been removed from the wishlist.
+
+    Constraints:
+    - The system should send the user's userId to the backend.
+    - If there is no userId the route should use the user's sessionId. 
+    - If no essionId is found the route should throw a 400 error.
+    - The system should delete the item from the user's wishlist.
+    - The system should update the frontend to show that the item has been removed from the user's wishlist.
+
+    What will be Tested:
+    - The system should send the user's userId to the backend.
+    - If there is no userId or sessionId in the backend it should return a 400 error.
+    - The error message should be "Error: Missing requirement sessionId".
+    - The system should delete the wishlistItem.
+    - If the system fails to delete the item it should return a 500 error.
+    - The error message should be "Internal server error".
+    - If the system succeeds it should return a 200 status.
+    - The status message should be "Successfully deleted item from wishlist"
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "wishlist", "RESTful API", "prisma", "backend", "authentication", "clerk"]
+parser_name: <jest>

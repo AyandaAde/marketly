@@ -1,0 +1,30 @@
+task_description: |
+  Task: Make cookies unique in the add-to-wishlist route.
+
+  We curently have an add to wishlist route that uses cookies to create a sessionId. Make each sessionId unique.
+
+  Instructions:
+
+    Goal:
+    - When a user adds an item to their wishlist for the first time when they are not logged in the system should create a unique sessionId for them.
+
+    Constraints:
+    - The route should use a hash function to hash the user's ip address to create a unique identifier.
+    - The hash function should use MARK to match the identifier to the Marketly webapp.
+    - If function to salt the identifier to make it even more unique.
+    - The function should use the last 3 digits of the current time stamp to ensure the identifier is unique.
+    - The route must save the sessionId to the user's cookies.
+
+    What will be Tested:
+    - The system should get the user's ip address.
+    - If the system fails to get the user's ip address it should return a 400 error.
+    - The error message should say "Error getting user's IP address".
+    - The system should use a hash function to create the sessionId.
+    - The route should save the sessionId to the user's cookies.
+    - The sessionId should contain the last three characters of the current timestamp.
+    - The route should save the sesssionId expiry to the database.
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "wishlist", "API", "sessions", "backend", "cookies"]
+parser_name: <|jest|>

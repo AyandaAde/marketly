@@ -1,0 +1,34 @@
+task_description: |
+  Task: Save cart sessionId as cartSessionId in cookies.
+
+  We currently have cart functionality that uses a sessionId, save the sessionId as cartSessionId
+  in the cookies.
+
+    Instructions:
+    
+    Goal:
+    - When a cartSessionId sessionId is created it should be saved as cartSessionId in the cookies.
+    - It should be saved in the create-cart route.
+    - It should be accessed in the get-cart, and add-to-cart route as cartSessionId.
+
+    Constraints:
+    - The cart sessionId should be saved as cartSessionId in the cookies.
+    - It should be accessed as cartSessionId.
+    - If the cartSessionId does not exist in the create-cart route it should be created.
+    - If the system in unable to create it it should return a 400 error.
+    - The error message should be "Error: Failed to create sessionId".
+
+    What will be Tested:
+    - The create-cart route should create a sessionId and save it to the cookies as cartSessionId.
+    - If the route fails to create the sessionId it should return a 400 error.
+    - The error message should be 'Error: Failed to create sessionId'.
+    - In the get-cart route it should accesss the cartSessionId as cartSessionId in the cookies.
+    - If it does not find a cartSessionId it should return a 404 error.
+    - The error message should be 'No sessionId found'.
+    - In the add-to-cart route it should access the cartSessionId as cartSessionId.
+    - In the create-cart route it shoult access the cartSessionId as cartSessionId.
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "cart", "API", "prisma", "backend", "sessionIds", "cookies"]
+parser_name: <jest>

@@ -42,4 +42,5 @@ echo "Running tests from: $TEST_FILE"
 npx jest "$TEST_FILE" \
   --testMatch="**/task_tests.tsx" \
   --runInBand \
-  --no-coverage
+  --no-coverage \
+  --verbose

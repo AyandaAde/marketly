@@ -1,0 +1,33 @@
+task_description: |
+  Task: Save the wishlist sessionId as wishlistSessionId in the cookies.
+
+  We currently have wishlist functionality that uses a sessionId, save the sessionId as wishlistSessionId
+  in the cookies.
+
+    Instructions:
+    
+    Goal:
+    - When a wishilist sessionId is created it should be saved as wishlistSessionId in the cookies.
+    - It should be saved in the add-to-wishlist route.
+    - It should be accessed in the get-wishlist, and add-to-wishlist route as wishlistSessionId.
+
+    Constraints:
+    - The wishlist sessionId should be saved as wishlistSessionId in the cookies.
+    - It should be accessed as wishlistSessionId.
+    - If the wishlistSessionId does not exist in the add-to-wishlist route it should be created.
+    - If the system in unable to create it it should return a 400 error.
+    - The error message should be "Error: Failed to create sessionId".
+
+    What will be Tested:
+    - The add-to-wishlist route should create a sessionId and save it to the cookies as wishlistSessionId.
+    - If the route fails to create the sessionId it should return a 400 error.
+    - The error message should be 'Error: Failed to create sessionId'.
+    - In the get-wishlist route it should accesss the wishlistSessionId as wishlistSessionId in the cookies.
+    - If it does not find a wishlistSessionId it should return a 404 error.
+    - The error message should be 'No sessionId found'.
+    - In the add-to-wishlist route it should access the wishlistSessionId as wishlistSessionId.
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "wishlist", "API", "prisma", "backend", "sessionIds", "cookies"]
+parser_name: <jest>
