@@ -4,26 +4,32 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for");
   const { userId, productId } = await req.json();
   try {
     if (!productId)
-      return new NextResponse("Missing required productId", {
-        status: 400,
-        statusText: "Missing required productId",
-      });
+      return new NextResponse("Missing required productId", { status: 400 });
 
     let wishlist;
+    let wishlistSessionId;
     const responseHeaders = new Headers();
+    let expiresDate: Date | undefined;
 
     if (!userId) {
-      let sessionId =
-        (await cookies()).get("sessionId")?.value || `user-${productId}`;
-      if (!sessionId) {
-        const expiresDate = addDays(new Date(), 30);
+      wishlistSessionId = (await cookies()).get("wishlistSessionId")?.value;
+      if (!wishlistSessionId) {
+        wishlistSessionId = `user-${ip}`;
+        if (!ip)
+          return new NextResponse("Error: Failed to create sessionId", {
+            status: 400,
+            statusText: "Error: Failed to create sessionId",
+          });
+
+        expiresDate = addDays(new Date(), 30);
 
         (await cookies()).set({
-          name: "sessionId",
-          value: sessionId,
+          name: "wishlistSessionId",
+          value: wishlistSessionId,
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           path: "/",
@@ -31,35 +37,25 @@ export async function POST(req: NextRequest) {
           expires: expiresDate,
         });
 
-        let cookieString = `sessionId=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresDate.toUTCString()}`;
+        let cookieString = `wishlistSessionId=${wishlistSessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresDate.toUTCString()}`;
         if (process.env.NODE_ENV === "production") {
           cookieString += "; Secure";
         }
+
         responseHeaders.set("Set-Cookie", cookieString);
       }
-      wishlist = await prisma.wishlist.findUnique({
-        where: {
-          sessionId,
+
+      wishlist = await prisma.wishlist.create({
+        data: {
+          sessionId: wishlistSessionId,
         },
       });
-      if (!wishlist)
-        wishlist = await prisma.wishlist.create({
-          data: {
-            sessionId,
-          },
-        });
     } else {
-      wishlist = await prisma.wishlist.findUnique({
-        where: {
+      wishlist = await prisma.wishlist.create({
+        data: {
           userId,
         },
       });
-      if (!wishlist)
-        wishlist = await prisma.wishlist.create({
-          data: {
-            userId,
-          },
-        });
     }
 
     await prisma.wishlistItem.create({
@@ -68,17 +64,33 @@ export async function POST(req: NextRequest) {
         productId,
       },
     });
+    const res1 = new NextResponse()
 
-    return new NextResponse("Successfully added item to wishlist", {
-      status: 200,
-      statusText: "Successfully added item to wishlist",
-      headers: responseHeaders,
-    });
+    const response = new NextResponse(
+      JSON.stringify({
+        message: "Successfully added item to wishlist",
+        wishlistSessionId,
+      }),
+      {
+        status: 200,
+        headers: responseHeaders,
+      }
+    );
+
+    //@ts-ignore
+      response.cookies.set({
+        name: "wishlistSessionId",
+        value: wishlistSessionId,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        sameSite: "lax",
+        expires: expiresDate,
+      });
+
+    return response;
   } catch (error: any) {
     console.error("Error adding item to wishlist", error.message);
-    return new NextResponse("Internal server error", {
-      status: 500,
-      statusText: "Internal server error",
-    });
+    return new NextResponse("Internal server error", { status: 500 });
   }
 }

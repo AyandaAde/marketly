@@ -122,9 +122,6 @@ export default function MarketplacePage() {
           userId,
         },
       });
-      setFavorites(
-        data?.wishlistItems.map((product: any) => product.productId)
-      );
       return data;
     },
   });
@@ -224,8 +221,9 @@ export default function MarketplacePage() {
     const shippingCosts = product.shippingCosts ?? { US: 60 };
     const estimatedDelivery = product.estimatedDelivery;
 
+    //@ts-expect-error cost
     const cost = shippingCosts[userLocation];
-
+    //@ts-expect-error delivery
     const delivery = estimatedDelivery[userLocation];
     return { cost, delivery };
   };

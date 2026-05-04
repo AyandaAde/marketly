@@ -20,7 +20,7 @@ export default function WishlistButton({
 }: WishlistButtonProps) {
   const addToWishlistMtn = useMutation({
     mutationFn: async (productId: string) => {
-      const { data } = await axios.post("/api/add-to-wishlist", {
+      const { data } = await axios.post("/api/wishlist/add-to-wishlist", {
         productId,
         userId,
       });

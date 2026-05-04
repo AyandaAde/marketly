@@ -5,21 +5,21 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId");
-  let sessionId;
+  let wishlistSessionId;
   if (!userId) {
-    sessionId = (await cookies()).get("sessionId")?.value;
-    if (!sessionId)
-      return new NextResponse("No sessionId found", { status: 400 });
+    wishlistSessionId = (await cookies()).get("wishlistSessionId")?.value;
+    if (!wishlistSessionId)
+      return new NextResponse("No sessionId found", {
+        status: 404,
+        statusText: "No sessionId found",
+      });
   }
   try {
     let wishlist;
-    if (sessionId) {
+    if (wishlistSessionId) {
       wishlist = await prisma.wishlist.findUnique({
         where: {
-          sessionId,
-        },
-        include: {
-          wishListItems: true,
+          sessionId: wishlistSessionId,
         },
       });
     } else if (userId) {
@@ -27,15 +27,30 @@ export async function GET(req: NextRequest) {
         where: {
           userId: userId!,
         },
-        include: {
-          wishListItems: true,
-        },
       });
     }
 
     if (!wishlist)
       return new NextResponse("Wishlist not found", { status: 404 });
-    return new NextResponse(JSON.stringify(wishlist), { status: 200 });
+
+    const response = new NextResponse(
+      JSON.stringify({ wishlist, wishlistSessionId }),
+      {
+        status: 200,
+      }
+    );
+    
+    //@ts-ignore
+    response.cookies.set({
+      name: "wishlistSessionId",
+      value: wishlistSessionId,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+    });
+
+    return response;
   } catch (error) {
     console.error("Error getting wishlist", error);
     return new NextResponse("Internal server error", { status: 500 });

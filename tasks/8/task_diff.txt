@@ -1,0 +1,192 @@
+diff --git a/app/api/wishlist/add-to-wishlist/route.ts b/app/api/wishlist/add-to-wishlist/route.ts
+new file mode 100644
+index 0000000..7547b88
+--- /dev/null
++++ b/app/api/wishlist/add-to-wishlist/route.ts
+@@ -0,0 +1,96 @@
++import { prisma } from "@/lib/db/prisma";
++import { addDays } from "date-fns";
++import { cookies } from "next/headers";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function POST(req: NextRequest) {
++  const ip = req.headers.get("x-forwarded-for");
++  const { userId, productId } = await req.json();
++  try {
++    if (!productId)
++      return new NextResponse("Missing required productId", { status: 400 });
++
++    let wishlist;
++    let wishlistSessionId;
++    const responseHeaders = new Headers();
++    let expiresDate: Date | undefined;
++
++    if (!userId) {
++      wishlistSessionId = (await cookies()).get("wishlistSessionId")?.value;
++      if (!wishlistSessionId) {
++        wishlistSessionId = `user-${ip}`;
++        if (!ip)
++          return new NextResponse("Error: Failed to create sessionId", {
++            status: 400,
++            statusText: "Error: Failed to create sessionId",
++          });
++
++        expiresDate = addDays(new Date(), 30);
++
++        (await cookies()).set({
++          name: "wishlistSessionId",
++          value: wishlistSessionId,
++          httpOnly: true,
++          secure: process.env.NODE_ENV === "production",
++          path: "/",
++          sameSite: "lax",
++          expires: expiresDate,
++        });
++
++        let cookieString = `wishlistSessionId=${wishlistSessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresDate.toUTCString()}`;
++        if (process.env.NODE_ENV === "production") {
++          cookieString += "; Secure";
++        }
++
++        responseHeaders.set("Set-Cookie", cookieString);
++      }
++
++      wishlist = await prisma.wishlist.create({
++        data: {
++          sessionId: wishlistSessionId,
++        },
++      });
++    } else {
++      wishlist = await prisma.wishlist.create({
++        data: {
++          userId,
++        },
++      });
++    }
++
++    await prisma.wishlistItem.create({
++      data: {
++        wishlistId: wishlist.id,
++        productId,
++      },
++    });
++    const res1 = new NextResponse()
++
++    const response = new NextResponse(
++      JSON.stringify({
++        message: "Successfully added item to wishlist",
++        wishlistSessionId,
++      }),
++      {
++        status: 200,
++        headers: responseHeaders,
++      }
++    );
++
++    //@ts-ignore
++      response.cookies.set({
++        name: "wishlistSessionId",
++        value: wishlistSessionId,
++        httpOnly: true,
++        secure: process.env.NODE_ENV === "production",
++        path: "/",
++        sameSite: "lax",
++        expires: expiresDate,
++      });
++
++    return response;
++  } catch (error: any) {
++    console.error("Error adding item to wishlist", error.message);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/app/api/wishlist/get-wishlist/route.ts b/app/api/wishlist/get-wishlist/route.ts
+new file mode 100644
+index 0000000..26f2e93
+--- /dev/null
++++ b/app/api/wishlist/get-wishlist/route.ts
+@@ -0,0 +1,58 @@
++import { prisma } from "@/lib/db/prisma";
++import { cookies } from "next/headers";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function GET(req: NextRequest) {
++  const { searchParams } = new URL(req.url);
++  const userId = searchParams.get("userId");
++  let wishlistSessionId;
++  if (!userId) {
++    wishlistSessionId = (await cookies()).get("wishlistSessionId")?.value;
++    if (!wishlistSessionId)
++      return new NextResponse("No sessionId found", {
++        status: 404,
++        statusText: "No sessionId found",
++      });
++  }
++  try {
++    let wishlist;
++    if (wishlistSessionId) {
++      wishlist = await prisma.wishlist.findUnique({
++        where: {
++          sessionId: wishlistSessionId,
++        },
++      });
++    } else if (userId) {
++      wishlist = await prisma.wishlist.findUnique({
++        where: {
++          userId: userId!,
++        },
++      });
++    }
++
++    if (!wishlist)
++      return new NextResponse("Wishlist not found", { status: 404 });
++
++    const response = new NextResponse(
++      JSON.stringify({ wishlist, wishlistSessionId }),
++      {
++        status: 200,
++      }
++    );
++    
++    //@ts-ignore
++    response.cookies.set({
++      name: "wishlistSessionId",
++      value: wishlistSessionId,
++      httpOnly: true,
++      secure: process.env.NODE_ENV === "production",
++      path: "/",
++      sameSite: "lax",
++    });
++
++    return response;
++  } catch (error) {
++    console.error("Error getting wishlist", error);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/app/marketplace/page.tsx b/app/marketplace/page.tsx
+index ed0f31f..a05bd44 100644
+--- a/app/marketplace/page.tsx
++++ b/app/marketplace/page.tsx
+@@ -117,7 +117,7 @@ export default function MarketplacePage() {
+   const getWishlist = useQuery({
+     queryKey: ["wishlist", userId],
+     queryFn: async () => {
+-      const { data } = await axios.get("/api/get-wishlist", {
++      const { data } = await axios.get("/api/wishlist/get-wishlist", {
+         params: {
+           userId,
+         },
+diff --git a/components/WishlistButton.tsx b/components/WishlistButton.tsx
+index d35dfa7..9828512 100644
+--- a/components/WishlistButton.tsx
++++ b/components/WishlistButton.tsx
+@@ -20,7 +20,7 @@ export default function WishlistButton({
+ }: WishlistButtonProps) {
+   const addToWishlistMtn = useMutation({
+     mutationFn: async (productId: string) => {
+-      const { data } = await axios.post("/api/add-to-wishlist", {
++      const { data } = await axios.post("/api/wishlist/add-to-wishlist", {
+         productId,
+         userId,
+       });
