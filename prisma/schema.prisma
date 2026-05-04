@@ -104,10 +104,9 @@ model Cart {
 }
 
 model wishlist {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String?
-  sessionId     String?
-  sessionExpiry DateTime?
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?
+  sessionId String?
 
   user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
   wishList wishlistItem[]

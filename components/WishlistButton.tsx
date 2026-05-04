@@ -4,7 +4,6 @@ import { Heart } from "lucide-react";
 import { Button } from "./ui/button";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-import { toast } from "sonner";
 
 interface WishlistButtonProps {
   productId: string;
@@ -31,24 +30,13 @@ export default function WishlistButton({
   });
 
   const toggleFavorite = (productId: string) => {
+    console.log("Submitting wishlist item.");
     setFavorites((prev: any[]) =>
       prev.includes(productId)
         ? prev.filter((id: string) => id !== productId)
         : [...prev, productId]
     );
-    addToWishlistMtn.mutate(productId, {
-      onSuccess: () => {
-        toast.success("Success", {
-          description: "Product successfully added to wishlist.",
-        });
-      },
-      onError: (error: any) => {
-        console.error("Error adding product to wishlist", error);
-        toast.error("Error", {
-          description: "Error adding product to wishlist. Please try again.",
-        });
-      },
-    });
+    addToWishlistMtn.mutate(productId);
   };
 
   return (
