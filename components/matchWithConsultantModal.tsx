@@ -25,6 +25,7 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
+import { toast } from "sonner";
 
 interface MatchWithConsultantModalProps {
   inquiry: string;
@@ -68,6 +69,9 @@ const inquirySchema = z.object({
   inquiry: z
     .string({ message: "Please enter an inquiry." })
     .min(1, { message: "Please enter an inquiry." }),
+  email: z
+    .string({ message: "Please enter a valid email." })
+    .email({ message: "Please enter a valid email." }),
 });
 
 type InquiryData = z.infer<typeof inquirySchema>;
@@ -86,6 +90,7 @@ export function MatchWithConsultantContent({
     resolver: zodResolver(inquirySchema),
     defaultValues: {
       inquiry: "",
+      email: "",
     },
   });
 
@@ -100,8 +105,15 @@ export function MatchWithConsultantContent({
   });
 
   const onSubmit = (data: InquiryData) => {
-    console.log("Submitting.");
-    sumbitInquiry.mutate(data, {});
+    sumbitInquiry.mutate(data, {
+      onSuccess: () => {
+        console.log("Successfully matched with consultant.");
+        inquiryForm.reset();
+      },
+      onError: () => {
+        console.error("Failed to match with consultant.");
+      },
+    });
   };
 
   return (
@@ -167,6 +179,23 @@ export function MatchWithConsultantContent({
                       <Input
                         type="text"
                         placeholder="I'd like to enquire about SEO."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-700/90" />
+                  </FormItem>
+                )}
+              />{" "}
+              <FormField
+                control={inquiryForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel htmlFor="inquiry">Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="jason.c@email.com"
                         {...field}
                       />
                     </FormControl>
