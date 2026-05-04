@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/animated-modal";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { ArrowRight, Loader } from "lucide-react";
 import { motion } from "motion/react";
@@ -25,6 +25,8 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
+import { useAuth } from "@clerk/nextjs";
+import { useEffect } from "react";
 
 interface MatchWithConsultantModalProps {
   inquiry: string;
@@ -80,12 +82,27 @@ type InquiryData = z.infer<typeof inquirySchema>;
 export function MatchWithConsultantContent({
   inquiry,
 }: MatchWithConsultantModalProps) {
+  const { userId } = useAuth();
+
   const { setOpen } = useModal();
   const images = [
     "/images/james-richardson.jpg",
     "/images/joseph-gonzalez.jpg",
     "/images/lola-dam.jpg",
   ];
+
+  const getUser = useQuery({
+    queryKey: ["getUser", userId],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/user/get-user`, {
+        params: {
+          userId,
+        },
+      });
+      return data;
+    },
+    enabled: !!userId,
+  });
 
   const inquiryForm = useForm<InquiryData>({
     resolver: zodResolver(inquirySchema),
@@ -118,6 +135,17 @@ export function MatchWithConsultantContent({
       },
     });
   };
+
+  useEffect(() => {
+    if (getUser.data) {
+      const { firstName, lastName, email } = getUser.data;
+      inquiryForm.reset({
+        firstName,
+        lastName,
+        email,
+      });
+    }
+  }, [getUser.data]);
 
   return (
     <div

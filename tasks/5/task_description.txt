@@ -1,0 +1,33 @@
+task_description: |
+  Task: Add the user's email, firstName and lastName to the form by defualt if they are logged in.
+
+  We currently have an inquiry form that allows a user to send an inquiry. Add the user's email, firstName and lastName to
+  the form by default if the user is logged in.
+  Instructions:
+
+    Goal:
+    - When a opens the MatchWithConsultantModal it should populate the form with their data by default if they are logged in.
+
+    Constraints:
+    - The form should have form validation.
+    - The form should throw an error if no firstName or lastName are present in the form.
+    - The user's details should be passed to the backend.
+    - The backend should throw an error if no firstName, lastName or email are present.
+
+    What will be Tested:
+    - The form should automatically have the firstName, lastName and email populated.
+    - If no firstName is passed to the backend it should throw 400 error.
+    - The error message should be 'Error: Missing requirement first name.'
+    - If no lastName is passed to the backend it should throw 400 error.
+    - The error message should be 'Error: Missing requirement last name.'
+    - If no email is passed to the backend it should throw 400 error.
+    - The error message should be 'Error: Missing requirement email.'
+    - The email in the route should match the user's email in the database. 
+    - The firstName in the route should match the user's firstName.
+    - The lastName in the route should match the user's lastName.
+
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "contact", "email", "form validation", "backend", "RESTful API", "authentication", "clerk", "prisma", "mongoDB"]
+parser_name: <|jest|>

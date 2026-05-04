@@ -1,9 +1,8 @@
 import { env } from "@/env";
 import { prisma } from "@/lib/db/prisma";
-import { consultant } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import nodemailer from "nodemailer";
+import OpenAI from "openai";
 
 export const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
@@ -140,4 +139,4 @@ export async function POST(req: NextRequest) {
       statusText: "Internal server error",
     });
   }
-}
+}
