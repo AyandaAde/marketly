@@ -1,0 +1,344 @@
+diff --git a/app/api/wishlist/add-to-wishlist/route.ts b/app/api/wishlist/add-to-wishlist/route.ts
+new file mode 100644
+index 0000000..7ce5811
+--- /dev/null
++++ b/app/api/wishlist/add-to-wishlist/route.ts
+@@ -0,0 +1,62 @@
++import { prisma } from "@/lib/db/prisma";
++import { addDays } from "date-fns";
++import { cookies } from "next/headers";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function POST(req: NextRequest) {
++  const { userId, productId } = await req.json();
++  try {
++    if (!productId)
++      return new NextResponse("Missing required productId", { status: 400 });
++
++    let wishlist;
++    const responseHeaders = new Headers();
++
++    if (!userId) {
++      const sessionId = `user-${productId}`;
++      const expiresDate = addDays(new Date(), 30);
++
++      (await cookies()).set({
++        name: "sessionId",
++        value: sessionId,
++        httpOnly: true,
++        secure: process.env.NODE_ENV === "production",
++        path: "/",
++        sameSite: "lax",
++        expires: expiresDate,
++      });
++
++      let cookieString = `sessionId=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresDate.toUTCString()}`;
++      if (process.env.NODE_ENV === "production") {
++        cookieString += "; Secure";
++      }
++      wishlist = await prisma.wishlist.create({
++        data: {
++          sessionId,
++        },
++      });
++      responseHeaders.set("Set-Cookie", cookieString);
++    } else {
++      wishlist = await prisma.wishlist.create({
++        data: {
++          userId,
++        },
++      });
++    }
++
++    await prisma.wishlistItem.create({
++      data: {
++        wishlistId: wishlist.id,
++        productId,
++      },
++    });
++
++    return new NextResponse("Successfully added item to wishlist", {
++      status: 200,
++      headers: responseHeaders,
++    });
++  } catch (error: any) {
++    console.error("Error adding item to wishlist", error.message);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/app/api/wishlist/delete-from-wishlist/route.ts b/app/api/wishlist/delete-from-wishlist/route.ts
+new file mode 100644
+index 0000000..70d24e2
+--- /dev/null
++++ b/app/api/wishlist/delete-from-wishlist/route.ts
+@@ -0,0 +1,68 @@
++import { prisma } from "@/lib/db/prisma";
++import { cookies } from "next/headers";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function DELETE(req: NextRequest) {
++  const data = await req.json();
++  const { userId, productId } = data;
++  try {
++    if (!productId)
++      return new NextResponse("Missing required productId", { status: 400 });
++
++    let wishlist;
++
++    if (!userId) {
++      const sessionId = (await cookies()).get("sessionId")?.value;
++
++      if (!sessionId)
++        return new NextResponse("No sessionId found", {
++          status: 400,
++          statusText: "No sessionId found",
++        });
++      else
++        wishlist = await prisma.wishlist.findUnique({
++          where: {
++            sessionId,
++          },
++        });
++    } else {
++      wishlist = await prisma.wishlist.findUnique({
++        where: {
++          userId,
++        },
++      });
++    }
++
++    if (!wishlist)
++      return new NextResponse("Wishlist not found", {
++        status: 404,
++        statusText: "Wishlist not found",
++      });
++
++    await prisma.wishlistItem.delete({
++      where: {
++        wishlistId_productId: {
++          wishlistId: wishlist.id,
++          productId,
++        },
++      },
++    });
++
++    return new NextResponse(
++      JSON.stringify({
++        message: "Successfully deleted item from wishlist",
++        userId,
++      }),
++      {
++        status: 200,
++        statusText: "Successfully deleted item from wishlist",
++      }
++    );
++  } catch (error: any) {
++    console.error("Error adding item to wishlist", error.message);
++    return new NextResponse("Internal server error", {
++      status: 500,
++      statusText: "Internal server error",
++    });
++  }
++}
+diff --git a/app/api/wishlist/get-wishlist/route.ts b/app/api/wishlist/get-wishlist/route.ts
+new file mode 100644
+index 0000000..002fc7a
+--- /dev/null
++++ b/app/api/wishlist/get-wishlist/route.ts
+@@ -0,0 +1,43 @@
++import { prisma } from "@/lib/db/prisma";
++import { cookies } from "next/headers";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function GET(req: NextRequest) {
++  const { searchParams } = new URL(req.url);
++  const userId = searchParams.get("userId");
++  let sessionId;
++  if (!userId) {
++    sessionId = (await cookies()).get("sessionId")?.value;
++    if (!sessionId)
++      return new NextResponse("No sessionId found", { status: 400 });
++  }
++  try {
++    let wishlist;
++    if (sessionId) {
++      wishlist = await prisma.wishlist.findUnique({
++        where: {
++          sessionId,
++        },
++        include: {
++          wishListItems: true,
++        },
++      });
++    } else if (userId) {
++      wishlist = await prisma.wishlist.findUnique({
++        where: {
++          userId: userId!,
++        },
++        include: {
++          wishListItems: true,
++        },
++      });
++    }
++
++    if (!wishlist)
++      return new NextResponse("Wishlist not found", { status: 404 });
++    return new NextResponse(JSON.stringify(wishlist), { status: 200 });
++  } catch (error) {
++    console.error("Error getting wishlist", error);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/app/marketplace/page.tsx b/app/marketplace/page.tsx
+index ed0f31f..9152181 100644
+--- a/app/marketplace/page.tsx
++++ b/app/marketplace/page.tsx
+@@ -117,11 +117,12 @@ export default function MarketplacePage() {
+   const getWishlist = useQuery({
+     queryKey: ["wishlist", userId],
+     queryFn: async () => {
+-      const { data } = await axios.get("/api/get-wishlist", {
++      const { data } = await axios.get("/api/wishlist/get-wishlist", {
+         params: {
+           userId,
+         },
+       });
++      setFavorites(data.wishlistItems.map((item: any) => item.productId));
+       return data;
+     },
+   });
+@@ -156,7 +157,7 @@ export default function MarketplacePage() {
+         const matchesSearch =
+           product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           product.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-          product.tags.some((tag) =>
++          product.tags.some((tag: any) =>
+             tag.toLowerCase().includes(searchQuery.toLowerCase())
+           );
+ 
+@@ -221,9 +222,8 @@ export default function MarketplacePage() {
+     const shippingCosts = product.shippingCosts ?? { US: 60 };
+     const estimatedDelivery = product.estimatedDelivery;
+ 
+-    //@ts-expect-error cost
+     const cost = shippingCosts[userLocation];
+-    //@ts-expect-error delivery
++
+     const delivery = estimatedDelivery[userLocation];
+     return { cost, delivery };
+   };
+@@ -246,6 +246,7 @@ export default function MarketplacePage() {
+             userId={userId}
+             setFavorites={setFavorites}
+             isInWishlist={favorites.includes(product.id)}
++            getWishlist={getWishlist}
+           />
+           {product.originalPrice && (
+             <Badge className="absolute top-2 left-2 bg-red-500">Sale</Badge>
+@@ -435,6 +436,7 @@ export default function MarketplacePage() {
+                   userId={userId}
+                   setFavorites={setFavorites}
+                   isInWishlist={favorites.includes(product.id)}
++                  getWishlist={getWishlist}
+                 />
+                 <div className="text-right">
+                   <div className="text-xl font-bold">${product.price} USD</div>
+diff --git a/components/WishlistButton.tsx b/components/WishlistButton.tsx
+index d35dfa7..af7ac06 100644
+--- a/components/WishlistButton.tsx
++++ b/components/WishlistButton.tsx
+@@ -4,12 +4,14 @@ import { Heart } from "lucide-react";
+ import { Button } from "./ui/button";
+ import { useMutation } from "@tanstack/react-query";
+ import axios from "axios";
++import { toast } from "sonner";
+ 
+ interface WishlistButtonProps {
+   productId: string;
+   userId: string | null | undefined;
+   setFavorites: React.Dispatch<React.SetStateAction<any[]>>;
+   isInWishlist: boolean;
++  getWishlist: any;
+ }
+ 
+ export default function WishlistButton({
+@@ -17,10 +19,11 @@ export default function WishlistButton({
+   userId,
+   setFavorites,
+   isInWishlist,
++  getWishlist,
+ }: WishlistButtonProps) {
+   const addToWishlistMtn = useMutation({
+     mutationFn: async (productId: string) => {
+-      const { data } = await axios.post("/api/add-to-wishlist", {
++      const { data } = await axios.post("/api/wishlist/add-to-wishlist", {
+         productId,
+         userId,
+       });
+@@ -29,14 +32,49 @@ export default function WishlistButton({
+     },
+   });
+ 
++  const deleteItemMtn = useMutation({
++    mutationFn: async (productId: string) => {
++      const { data } = await axios.delete(
++        "/api/wishlist/delete-from-wishlist",
++        {
++          data: {
++            productId,
++            userId,
++          },
++        }
++      );
++
++      return data;
++    },
++  });
++
+   const toggleFavorite = (productId: string) => {
+-    console.log("Submitting wishlist item.");
+     setFavorites((prev: any[]) =>
+       prev.includes(productId)
+         ? prev.filter((id: string) => id !== productId)
+         : [...prev, productId]
+     );
+-    addToWishlistMtn.mutate(productId);
++    if (!isInWishlist)
++      addToWishlistMtn.mutate(productId, {
++        onSuccess: () => {
++          getWishlist.refetch();
++          toast.success("Success", {
++            description: "Successfully added product to wishlist.",
++          });
++        },
++        onError: (error: any) => {
++          console.error("Error adding product to wishlist", error);
++          toast.error("Error", {
++            description: "Error adding product to wishlist. Please try again.",
++          });
++        },
++      });
++    else
++      deleteItemMtn.mutate(productId, {
++        onSuccess: () => {
++          getWishlist.refetch();
++        },
++      });
+   };
+ 
+   return (
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 0de966b..870dd93 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -108,8 +108,8 @@ model wishlist {
+   userId    String?
+   sessionId String?
+ 
+-  user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+-  wishList wishlistItem[]
++  user         individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
++  wishlistItems wishlistItem[]
+ 
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt

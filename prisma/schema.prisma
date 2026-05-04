@@ -108,8 +108,8 @@ model wishlist {
   userId    String?
   sessionId String?
 
-  user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  wishList wishlistItem[]
+  user         individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  wishlistItems wishlistItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
