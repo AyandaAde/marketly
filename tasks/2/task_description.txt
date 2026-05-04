@@ -1,0 +1,35 @@
+task_description: |
+  Task: Implement semantic search to the match with best consultant.
+
+  We currently have consultant matching capabilities in the app, use AI to semantically match the user with a consultant.
+
+  Instructions:
+
+    Goal:
+    - Use AI to use semantics to match a user's inquiry with the best consultant.
+    - Categorise the user's inquiry according the the consultant's areas of expertise.
+    - Match the user with a consultant.
+
+    Constraints:
+    - The endpoint must recieve an inquiry.
+    - If no inquiry is recieved the route must return a 400 error.
+    - The system must use AI to  match the user with a consultant.
+    - If the system fails to match the user with a consultant it should fallback to searching through an array.
+    - Upon successful matching with a consultant the route should return a 200 status.
+    - The status message should be "Successfully matched user with consultant."
+    - If the endpoint fails it should return a 500 error.
+    - The error message should be "Internal server error.".
+
+    What will be Tested:
+    - If no inquiry is present the route should return a 400 error.
+    - The error message should say "Error: Missing requirement inquiry".
+    - The enpoint must use AI to match the user with a consultant.
+    - If the route successfully matches the user with a consultant it should return a 200 status.
+    - The status message should be "Successfully matched user with consultant."
+    - If the route fails to match the user with a consultant it should return a 500 status.
+    - The status message should be "Internal server error".
+
+difficulty: hard
+category: <Feature>
+tags: ["nextjs", "react", "contact", "AI", "openai", "API", "backend", "prisma", "error-handling"]
+parser_name: <jest>

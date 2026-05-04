@@ -139,7 +139,7 @@ model wishlistItem {
 model consultant {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
   image     String
-  name     String
+  name      String
   email     String
   title     String
   expertise expertise[]

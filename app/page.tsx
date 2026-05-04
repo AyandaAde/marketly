@@ -575,7 +575,7 @@ export default function Home() {
             </div>
             <div className="mx-auto max-w-5xl">
               <FocusCards cards={team} />
-              <MatchWithConsultantModal inquiry="Hi, I have a have a website I'd like enhanced." />
+              <MatchWithConsultantModal inquiry="Hi, I need help with SEO." />
             </div>
           </div>
         </section>
