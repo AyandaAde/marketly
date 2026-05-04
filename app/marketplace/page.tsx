@@ -117,7 +117,7 @@ export default function MarketplacePage() {
   const getWishlist = useQuery({
     queryKey: ["wishlist", userId],
     queryFn: async () => {
-      const { data } = await axios.get("/api/wishlist/get-wishlist", {
+      const { data } = await axios.get("/api/get-wishlist", {
         params: {
           userId,
         },

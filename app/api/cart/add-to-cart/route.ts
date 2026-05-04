@@ -1,11 +1,20 @@
 import { prisma } from "@/lib/db/prisma";
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { productId, quantity, userId } = body;
-  if (!userId)
-    return new NextResponse("Missing required userId", { status: 400 });
+  let cartSessionId;
+  if (!userId) {
+    cartSessionId = (await cookies()).get("cartSessionId")?.value;
+    if (!cartSessionId)
+      return new NextResponse("No sessionId found", {
+        status: 404,
+        statusText: "No sessionId found",
+      });
+  }
+
   if (!productId)
     return new NextResponse("Missing required productId", { status: 400 });
   if (!quantity)
@@ -51,9 +60,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return new NextResponse("Successfully added item to cart.", {
-      status: 200,
+    const response = new NextResponse(
+      JSON.stringify({
+        message: "Successfully added item to cart",
+        cartSessionId,
+      }),
+      {
+        status: 200,
+      }
+    );
+
+    //@ts-ignore
+    response.cookies.set({
+      name: "cartSessionId",
+      value: cartSessionId,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
     });
+
+    return response;
   } catch (error: any) {
     console.error("Error adding item to cart", error.message);
     return new NextResponse(error.message, { status: 500 });
