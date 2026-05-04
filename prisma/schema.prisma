@@ -8,11 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-type expertise {
-  title String
-  value String
-}
-
 model business {
   id             String  @id @default(auto()) @map("_id") @db.ObjectId
   userId         String?
@@ -109,9 +104,10 @@ model Cart {
 }
 
 model wishlist {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String?
-  sessionId String?
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String?
+  sessionId     String?
+  sessionExpiry DateTime?
 
   user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
   wishList wishlistItem[]
@@ -135,16 +131,3 @@ model wishlistItem {
   @@unique([wishlistId, productId])
   @@map("wishlistItems")
 }
-
-model consultant {
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  image     String
-  name      String
-  email     String
-  title     String
-  expertise expertise[]
-  initials  String
-  location  String
-
-  @@map("consultants")
-}  

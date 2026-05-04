@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/animated-modal";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { ArrowRight, Loader } from "lucide-react";
 import { motion } from "motion/react";
@@ -25,8 +25,6 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
-import { useAuth } from "@clerk/nextjs";
-import { useEffect } from "react";
 
 interface MatchWithConsultantModalProps {
   inquiry: string;
@@ -70,11 +68,6 @@ const inquirySchema = z.object({
   inquiry: z
     .string({ message: "Please enter an inquiry." })
     .min(1, { message: "Please enter an inquiry." }),
-  firstName: z.string().min(1, { message: "Please enter a first name." }),
-  lastName: z.string().min(1, { message: "Please enter a last name." }),
-  email: z
-    .string({ message: "Please enter a valid email." })
-    .email({ message: "Please enter a valid email." }),
 });
 
 type InquiryData = z.infer<typeof inquirySchema>;
@@ -82,8 +75,6 @@ type InquiryData = z.infer<typeof inquirySchema>;
 export function MatchWithConsultantContent({
   inquiry,
 }: MatchWithConsultantModalProps) {
-  const { userId } = useAuth();
-
   const { setOpen } = useModal();
   const images = [
     "/images/james-richardson.jpg",
@@ -91,26 +82,10 @@ export function MatchWithConsultantContent({
     "/images/lola-dam.jpg",
   ];
 
-  const getUser = useQuery({
-    queryKey: ["getUser", userId],
-    queryFn: async () => {
-      const { data } = await axios.get(`/api/user/get-user`, {
-        params: {
-          userId,
-        },
-      });
-      return data;
-    },
-    enabled: !!userId,
-  });
-
   const inquiryForm = useForm<InquiryData>({
     resolver: zodResolver(inquirySchema),
     defaultValues: {
       inquiry: "",
-      firstName: "",
-      lastName: "",
-      email: "",
     },
   });
 
@@ -125,27 +100,9 @@ export function MatchWithConsultantContent({
   });
 
   const onSubmit = (data: InquiryData) => {
-    sumbitInquiry.mutate(data, {
-      onSuccess: () => {
-        console.log("Successfully matched with consultant.");
-        inquiryForm.reset();
-      },
-      onError: () => {
-        console.error("Failed to match with consultant.");
-      },
-    });
+    console.log("Submitting.");
+    sumbitInquiry.mutate(data, {});
   };
-
-  useEffect(() => {
-    if (getUser.data) {
-      const { firstName, lastName, email } = getUser.data;
-      inquiryForm.reset({
-        firstName,
-        lastName,
-        email,
-      });
-    }
-  }, [getUser.data]);
 
   return (
     <div
@@ -200,51 +157,6 @@ export function MatchWithConsultantContent({
               onSubmit={inquiryForm.handleSubmit(onSubmit)}
               className="space-y-4 mt-5 w-10/12 mx-auto"
             >
-              <div className="flex flex-col md:flex-row gap-4">
-                <FormField
-                  control={inquiryForm.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabel htmlFor="firstName">First Name</FormLabel>
-                      <FormControl>
-                        <Input type="text" placeholder="Jason" {...field} />
-                      </FormControl>
-                      <FormMessage className="text-red-700/90" />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={inquiryForm.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabel htmlFor="lastName">Lasr Name</FormLabel>
-                      <FormControl>
-                        <Input type="text" placeholder="Clark" {...field} />
-                      </FormControl>
-                      <FormMessage className="text-red-700/90" />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={inquiryForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabel htmlFor="inquiry">Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="jason.c@email.com"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-red-700/90" />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={inquiryForm.control}
                 name="inquiry"

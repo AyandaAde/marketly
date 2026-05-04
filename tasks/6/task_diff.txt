@@ -1,0 +1,194 @@
+diff --git a/app/api/add-to-wishlist/route.ts b/app/api/add-to-wishlist/route.ts
+index 7ce5811..bc9ac7c 100644
+--- a/app/api/add-to-wishlist/route.ts
++++ b/app/api/add-to-wishlist/route.ts
+@@ -2,8 +2,15 @@ import { prisma } from "@/lib/db/prisma";
+ import { addDays } from "date-fns";
+ import { cookies } from "next/headers";
+ import { NextRequest, NextResponse } from "next/server";
++import crypto from "crypto";
+ 
+ export async function POST(req: NextRequest) {
++  const ip = req.headers.get("x-forwarded-for");
++  if (!ip)
++    return new NextResponse("Error getting user's IP address", {
++      status: 400,
++      statusText: "Error getting user's IP address",
++    });
+   const { userId, productId } = await req.json();
+   try {
+     if (!productId)
+@@ -11,9 +18,57 @@ export async function POST(req: NextRequest) {
+ 
+     let wishlist;
+     const responseHeaders = new Headers();
++    let hashedAndSalted;
+ 
+     if (!userId) {
+-      const sessionId = `user-${productId}`;
++      const createSessionId = (ip: string) => {
++        let sessionId =
++          ip !== "unknown"
++            ? ip
++                .toLowerCase()
++                .trim()
++                .replace(/[^a-z0-9]/g, "")
++            : productId
++                .toLowerCase()
++                .trim()
++                .replace(/[^a-z0-9]/g, "");
++
++        const hash = crypto
++          .createHash("sha256")
++          .update(sessionId)
++          .digest("base64url");
++
++        let salt = crypto.randomBytes(6).toString("base64url");
++
++        sessionId = crypto
++          .createHash("sha256")
++          .update(hash + salt)
++          .digest("base64url");
++
++        hashedAndSalted = sessionId;
++
++        let i = 0;
++
++        sessionId = sessionId.slice(0, 17);
++
++        let numericHash = 0;
++        for (let i = 0; i < hash.length; i++) {
++          numericHash = (numericHash * 31 + hash.charCodeAt(i)) | 0;
++        }
++
++        while (sessionId.length < 20 - 3) {
++          const chars =
++            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
++          sessionId += chars[Math.abs(numericHash + i * 31) % chars.length];
++          i++;
++        }
++
++        const timestampPart = Date.now().toString(36).slice(-3);
++        sessionId += timestampPart;
++
++        return `${sessionId}${timestampPart}`;
++      };
++      const sessionId = createSessionId(ip);
+       const expiresDate = addDays(new Date(), 30);
+ 
+       (await cookies()).set({
+@@ -33,6 +88,7 @@ export async function POST(req: NextRequest) {
+       wishlist = await prisma.wishlist.create({
+         data: {
+           sessionId,
++          sessionExpiry: expiresDate,
+         },
+       });
+       responseHeaders.set("Set-Cookie", cookieString);
+@@ -51,10 +107,17 @@ export async function POST(req: NextRequest) {
+       },
+     });
+ 
+-    return new NextResponse("Successfully added item to wishlist", {
+-      status: 200,
+-      headers: responseHeaders,
+-    });
++    return new NextResponse(
++      JSON.stringify({
++        message: "Successfully added item to wishlist",
++        ip,
++        hashedAndSalted,
++      }),
++      {
++        status: 200,
++        headers: responseHeaders,
++      }
++    );
+   } catch (error: any) {
+     console.error("Error adding item to wishlist", error.message);
+     return new NextResponse("Internal server error", { status: 500 });
+diff --git a/app/api/user/get-user/[userId]/route.ts b/app/api/user/get-user/[userId]/route.ts
+new file mode 100644
+index 0000000..a212c23
+--- /dev/null
++++ b/app/api/user/get-user/[userId]/route.ts
+@@ -0,0 +1,22 @@
++import { prisma } from "@/lib/db/prisma";
++import { NextRequest, NextResponse } from "next/server";
++
++export async function GET(
++  req: NextRequest,
++  { params }: { params: { userId: string } }
++) {
++  const { userId } = params;
++
++  try {
++    const user = await prisma.individual.findUnique({
++      where: {
++        userId,
++      },
++    });
++
++    return new NextResponse(JSON.stringify(user), { status: 200 });
++  } catch (error) {
++    console.error("Error getting user", error);
++    return new NextResponse("Internal server error", { status: 500 });
++  }
++}
+diff --git a/components/WishlistButton.tsx b/components/WishlistButton.tsx
+index d35dfa7..31e56ae 100644
+--- a/components/WishlistButton.tsx
++++ b/components/WishlistButton.tsx
+@@ -4,6 +4,7 @@ import { Heart } from "lucide-react";
+ import { Button } from "./ui/button";
+ import { useMutation } from "@tanstack/react-query";
+ import axios from "axios";
++import { toast } from "sonner";
+ 
+ interface WishlistButtonProps {
+   productId: string;
+@@ -30,13 +31,24 @@ export default function WishlistButton({
+   });
+ 
+   const toggleFavorite = (productId: string) => {
+-    console.log("Submitting wishlist item.");
+     setFavorites((prev: any[]) =>
+       prev.includes(productId)
+         ? prev.filter((id: string) => id !== productId)
+         : [...prev, productId]
+     );
+-    addToWishlistMtn.mutate(productId);
++    addToWishlistMtn.mutate(productId, {
++      onSuccess: () => {
++        toast.success("Success", {
++          description: "Product successfully added to wishlist.",
++        });
++      },
++      onError: (error: any) => {
++        console.error("Error adding product to wishlist", error);
++        toast.error("Error", {
++          description: "Error adding product to wishlist. Please try again.",
++        });
++      },
++    });
+   };
+ 
+   return (
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 0de966b..3b4c1e6 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -104,9 +104,10 @@ model Cart {
+ }
+ 
+ model wishlist {
+-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+-  userId    String?
+-  sessionId String?
++  id            String    @id @default(auto()) @map("_id") @db.ObjectId
++  userId        String?
++  sessionId     String?
++  sessionExpiry DateTime?
+ 
+   user     individual?    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+   wishList wishlistItem[]
