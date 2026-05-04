@@ -1,7 +1,7 @@
 import { env } from "@/env";
 import { prisma } from "@/lib/db/prisma";
-import { consultant } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
+import nodemailer from "nodemailer";
 import OpenAI from "openai";
 
 export const openai = new OpenAI({
@@ -9,6 +9,17 @@ export const openai = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: env.EMAIL_USER,
+      pass: env.EMAIL_PASSWORD,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
   try {
     const { inquiry, email } = await req.json();
 
@@ -19,7 +30,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!email) throw new Error("Internal server error.");
+    if (!email)
+      return new NextResponse("Error: Missing requirement email", {
+        status: 400,
+        statusText: "Error: Missing requirement user email",
+      });
 
     const consultants = await prisma.consultant.findMany();
 
@@ -46,7 +61,7 @@ export async function POST(req: NextRequest) {
         }
      `,
       input: `
-       Categories: ${JSON.stringify(categories)}
+       Categories: ${JSON.stringify(uniqueCategories)}
               Inquiry:
               "${inquiry}"
               `,
@@ -81,6 +96,21 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    const mailOptions = {
+      from: `<${email}>`,
+      to: "akinyambo@kondarsoft.com",
+      cc: consultant?.email ?? "",
+      subject: `Contact Form Submission from ${email}`,
+      replyto: `${email}`,
+      html: `<div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
+              <h2>New Contact Submission from ${email}</h2>
+                  <p><strong>Inquiry:</strong>${inquiry}</p>
+              </div>
+            `,
+    };
+
+    await transporter.sendMail(mailOptions);
 
     return new NextResponse(
       JSON.stringify({ consultant, category: category! }),

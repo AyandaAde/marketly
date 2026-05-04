@@ -1,0 +1,31 @@
+task_description: |
+  Task: Send an email to the consultant when a user matches with a consultant
+
+  We have a match with consultant feature, make it so when a user matches with a consultant it sends an email to the consultant to notify them of the match.
+  
+  Instructions:
+
+    Goal:
+    - Add an email field to the match with consultant form.
+    - Send an email to the consultant once the user is matched with a consultant.
+
+    Constraints:
+    - The input form must have an email field.
+    - The form must send the user's inquiry and email to the backend. 
+    - The backeend should send an email to the consultnat once the user is matched with a consultant.
+
+    What will be Tested:
+    - If there is no email in the body of the request the endpoint must return a 400 error.
+    - The error message must say "Error: Missing requirement user email".
+    - If there is no inquiry in the body of the request the endpoint must return a 400 error. 
+    - The error message must say "Error: Missing requirement inquiry".
+    - The endpoint must send an email to the consultant once the user is matched with a consultant.
+    - If the endpoint manages to send an email to the consultant it must return a 200 status.
+    - The status message must say "Successfully matched with consultant."
+    - If the endpoint fails to match a user with a consultant it should return a 500 error.
+    - The error message must say "Internal server error."
+
+difficulty: medium
+category: <Feature>
+tags: ["nextjs", "react", "contact", "error-handling", "backend", "api", "nodemailer"]
+parser_name: <jest>
