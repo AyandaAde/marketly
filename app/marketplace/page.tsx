@@ -117,12 +117,11 @@ export default function MarketplacePage() {
   const getWishlist = useQuery({
     queryKey: ["wishlist", userId],
     queryFn: async () => {
-      const { data } = await axios.get("/api/wishlist/get-wishlist", {
+      const { data } = await axios.get("/api/get-wishlist", {
         params: {
           userId,
         },
       });
-      setFavorites(data.wishlistItems.map((item: any) => item.productId));
       return data;
     },
   });
@@ -157,7 +156,7 @@ export default function MarketplacePage() {
         const matchesSearch =
           product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           product.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.tags.some((tag: any) =>
+          product.tags.some((tag) =>
             tag.toLowerCase().includes(searchQuery.toLowerCase())
           );
 
@@ -222,8 +221,9 @@ export default function MarketplacePage() {
     const shippingCosts = product.shippingCosts ?? { US: 60 };
     const estimatedDelivery = product.estimatedDelivery;
 
+    //@ts-expect-error cost
     const cost = shippingCosts[userLocation];
-
+    //@ts-expect-error delivery
     const delivery = estimatedDelivery[userLocation];
     return { cost, delivery };
   };
@@ -246,7 +246,6 @@ export default function MarketplacePage() {
             userId={userId}
             setFavorites={setFavorites}
             isInWishlist={favorites.includes(product.id)}
-            getWishlist={getWishlist}
           />
           {product.originalPrice && (
             <Badge className="absolute top-2 left-2 bg-red-500">Sale</Badge>
@@ -436,7 +435,6 @@ export default function MarketplacePage() {
                   userId={userId}
                   setFavorites={setFavorites}
                   isInWishlist={favorites.includes(product.id)}
-                  getWishlist={getWishlist}
                 />
                 <div className="text-right">
                   <div className="text-xl font-bold">${product.price} USD</div>
