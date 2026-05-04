@@ -1,8 +1,9 @@
 import { env } from "@/env";
 import { prisma } from "@/lib/db/prisma";
+import { consultant } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import OpenAI from "openai";
+import nodemailer from "nodemailer";
 
 export const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
@@ -21,20 +22,31 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    const { inquiry, email } = await req.json();
-
-    if (!inquiry) {
-      return new NextResponse("Error: Missing requirement inquiry", {
-        status: 400,
-        statusText: "Error: Missing requirement inquiry",
-      });
-    }
-
-    if (!email)
-      return new NextResponse("Error: Missing requirement email", {
-        status: 400,
-        statusText: "Error: Missing requirement user email",
-      });
+    const { inquiry, firstName, lastName, email } = await req.json();
+    if (!email || !inquiry || !firstName || !lastName)
+      return new NextResponse(
+        `Error: Missing requirement ${
+          !email
+            ? "email"
+            : !inquiry
+            ? "inquiry"
+            : !firstName
+            ? "first name"
+            : "last name"
+        }`,
+        {
+          status: 400,
+          statusText: `Error: Missing requirement ${
+            !email
+              ? "email"
+              : !inquiry
+              ? "inquiry"
+              : !firstName
+              ? "first name"
+              : "last name"
+          }`,
+        }
+      );
 
     const consultants = await prisma.consultant.findMany();
 
@@ -98,18 +110,20 @@ export async function POST(req: NextRequest) {
     }
 
     const mailOptions = {
-      from: `<${email}>`,
+      from: `${firstName} ${lastName} <${email}>`,
       to: "akinyambo@kondarsoft.com",
       cc: consultant?.email ?? "",
-      subject: `Contact Form Submission from ${email}`,
+      subject: `Contact Form Submission from ${firstName} ${lastName}`,
       replyto: `${email}`,
       html: `<div style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
-              <h2>New Contact Submission from ${email}</h2>
-                  <p><strong>Inquiry:</strong>${inquiry}</p>
-              </div>
-            `,
+<h2>New Contact Submission from ${firstName} ${lastName}</h2>
+<p><strong>First Name:</strong> ${firstName}</p>
+<p><strong>Last Name:</strong> ${lastName}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <br/>
+    <p><strong>Inquiry:</strong>${inquiry}</p>
+</div>`,
     };
-
     await transporter.sendMail(mailOptions);
 
     return new NextResponse(

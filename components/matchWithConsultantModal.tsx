@@ -25,7 +25,6 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
-import { toast } from "sonner";
 
 interface MatchWithConsultantModalProps {
   inquiry: string;
@@ -69,6 +68,8 @@ const inquirySchema = z.object({
   inquiry: z
     .string({ message: "Please enter an inquiry." })
     .min(1, { message: "Please enter an inquiry." }),
+  firstName: z.string().min(1, { message: "Please enter a first name." }),
+  lastName: z.string().min(1, { message: "Please enter a last name." }),
   email: z
     .string({ message: "Please enter a valid email." })
     .email({ message: "Please enter a valid email." }),
@@ -90,6 +91,8 @@ export function MatchWithConsultantContent({
     resolver: zodResolver(inquirySchema),
     defaultValues: {
       inquiry: "",
+      firstName: "",
+      lastName: "",
       email: "",
     },
   });
@@ -169,23 +172,34 @@ export function MatchWithConsultantContent({
               onSubmit={inquiryForm.handleSubmit(onSubmit)}
               className="space-y-4 mt-5 w-10/12 mx-auto"
             >
-              <FormField
-                control={inquiryForm.control}
-                name="inquiry"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabel htmlFor="inquiry">Inquiry</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="I'd like to enquire about SEO."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-red-700/90" />
-                  </FormItem>
-                )}
-              />{" "}
+              <div className="flex flex-col md:flex-row gap-4">
+                <FormField
+                  control={inquiryForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel htmlFor="firstName">First Name</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="Jason" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-red-700/90" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={inquiryForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel htmlFor="lastName">Lasr Name</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="Clark" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-red-700/90" />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={inquiryForm.control}
                 name="email"
@@ -196,6 +210,23 @@ export function MatchWithConsultantContent({
                       <Input
                         type="email"
                         placeholder="jason.c@email.com"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-700/90" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={inquiryForm.control}
+                name="inquiry"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel htmlFor="inquiry">Inquiry</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="I'd like to enquire about SEO."
                         {...field}
                       />
                     </FormControl>
